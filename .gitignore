@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.xlsx
+*.pdf
+.streamlit/secrets.toml
+.env

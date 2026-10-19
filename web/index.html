@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Reconciliation</title>
+<style>
+  :root {
+    --bg:#f4f6f9; --surface:#fff; --surface2:#f8f9fb; --ink:#172033; --mute:#667085; --line:#e3e7ee;
+    --accent:#2457d6; --accent-ink:#fff; --accent-soft:#e8eefc;
+    --red:#c2371f; --red-bg:#fdeae6; --amber:#9a6200; --amber-bg:#fff3d6; --green:#1d7a46; --green-bg:#e3f4ea; --blue:#1f5fa8; --blue-bg:#e6f0fb;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.05); --r:12px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#0f141c; --surface:#171e29; --surface2:#1c2431; --ink:#e9eef6; --mute:#94a0b4; --line:#2a3342;
+    --accent:#6d97f5; --accent-ink:#0b1220; --accent-soft:#1d2a47;
+    --red:#ff8b73; --red-bg:#3d2019; --amber:#f0be5a; --amber-bg:#3a2e12; --green:#6fd59a; --green-bg:#16301f; --blue:#8bbcf2; --blue-bg:#16283d;
+    --shadow:none; } }
+  :root[data-theme="dark"] {
+    --bg:#0f141c; --surface:#171e29; --surface2:#1c2431; --ink:#e9eef6; --mute:#94a0b4; --line:#2a3342;
+    --accent:#6d97f5; --accent-ink:#0b1220; --accent-soft:#1d2a47;
+    --red:#ff8b73; --red-bg:#3d2019; --amber:#f0be5a; --amber-bg:#3a2e12; --green:#6fd59a; --green-bg:#16301f; --blue:#8bbcf2; --blue-bg:#16283d; --shadow:none; }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  .topbar { position:sticky; top:0; z-index:20; background:var(--surface); border-bottom:1px solid var(--line); }
+  .topbar-in { max-width:1040px; margin:0 auto; padding:12px 16px; display:flex; align-items:center; gap:12px; }
+  .logo { width:34px; height:34px; border-radius:9px; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font-size:18px; flex:none; }
+  .brand b { display:block; font-size:16px; line-height:1.2; } .brand span { font-size:12px; color:var(--mute); }
+  .spacer { flex:1; }
+  main { max-width:1040px; margin:0 auto; padding:22px 16px 110px; }
+  .intro { margin:0 0 18px; color:var(--mute); max-width:70ch; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); margin-bottom:16px; }
+  .card-h { display:flex; gap:12px; align-items:center; padding:14px 18px; border-bottom:1px solid var(--line); }
+  .stepn { width:26px; height:26px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:13px; display:grid; place-items:center; flex:none; }
+  .card-h h2 { margin:0; font-size:16px; } .card-h p { margin:0; font-size:13px; color:var(--mute); }
+  .card-b { padding:16px 18px 18px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+  label.lbl { display:block; font-size:12.5px; font-weight:600; color:var(--mute); margin:0 0 5px; letter-spacing:.01em; }
+  input[type=text], input[type=date], input[type=password], input[type=number], select, textarea {
+    width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; }
+  textarea { font-family:ui-monospace,Consolas,monospace; font-size:13px; min-height:74px; resize:vertical; }
+  input:focus, select:focus, textarea:focus, .drop:focus-within, button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .hint { color:var(--mute); font-size:13px; margin:6px 0 0; }
+  /* drop zones */
+  .drop { position:relative; display:flex; gap:10px; align-items:center; padding:12px 14px; border:1.5px dashed var(--line); border-radius:10px; background:var(--surface2); cursor:pointer; transition:.15s; min-height:62px; }
+  .drop:hover, .drop.over { border-color:var(--accent); background:var(--accent-soft); }
+  .drop.has { border-style:solid; border-color:var(--green); background:var(--green-bg); }
+  .drop input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+  .drop .ic { font-size:20px; flex:none; } .drop .t { min-width:0; } .drop .t b { display:block; font-size:13.5px; }
+  .drop .t span { font-size:12.5px; color:var(--mute); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .drop.has .t span { color:var(--green); }
+  .sub-card { border:1px solid var(--line); border-radius:10px; padding:14px; margin-top:12px; background:var(--surface2); }
+  .sub-card > .row-h { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-weight:600; font-size:14px; }
+  .stepper { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--surface); }
+  .stepper button { border:0; background:transparent; width:34px; height:34px; font-size:18px; cursor:pointer; color:var(--ink); }
+  .stepper button:hover { background:var(--accent-soft); } .stepper output { min-width:34px; text-align:center; font-weight:600; }
+  .section-t { font-size:14px; font-weight:700; margin:20px 0 8px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .section-t:first-child { margin-top:0; }
+  details > summary { cursor:pointer; font-weight:600; font-size:14px; padding:2px 0; } details[open] > summary { margin-bottom:8px; }
+  /* buttons */
+  button { font:inherit; } .btn { padding:10px 18px; border-radius:9px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; font-weight:600; }
+  .btn:hover { background:var(--surface2); }
+  .btn.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); } .btn.primary:hover { filter:brightness(1.08); }
+  .btn:disabled { opacity:.6; cursor:progress; } .btn.sm { padding:6px 12px; font-size:13px; font-weight:500; }
+  /* action bar */
+  .actionbar { position:fixed; left:0; right:0; bottom:0; z-index:15; background:var(--surface); border-top:1px solid var(--line); box-shadow:0 -4px 16px rgba(16,24,40,.06); }
+  .actionbar-in { max-width:1040px; margin:0 auto; padding:10px 16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .checks { display:flex; gap:8px; flex-wrap:wrap; flex:1; min-width:200px; }
+  .chip { font-size:12.5px; padding:3px 10px; border-radius:99px; background:var(--surface2); border:1px solid var(--line); color:var(--mute); }
+  .chip.ok { background:var(--green-bg); color:var(--green); border-color:transparent; }
+  .spin { display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes sp { to { transform:rotate(360deg); } } @media (prefers-reduced-motion:reduce){ .spin{animation-duration:2s} html{scroll-behavior:auto} }
+  /* alerts */
+  .alert { padding:12px 14px; border-radius:10px; margin:0 0 14px; font-size:14px; display:flex; gap:10px; }
+  .alert.err { background:var(--red-bg); color:var(--red); } .alert.ok { background:var(--green-bg); color:var(--green); }
+  /* results */
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-bottom:16px; }
+  .kpi { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:16px 18px; box-shadow:var(--shadow); }
+  .kpi span { font-size:12.5px; font-weight:600; color:var(--mute); text-transform:uppercase; letter-spacing:.04em; }
+  .kpi b { display:block; font-size:28px; margin:4px 0 2px; letter-spacing:-.01em; } .kpi small { color:var(--mute); font-size:12.5px; }
+  .kpi.cash b { color:var(--amber); }
+  .bar { height:8px; border-radius:99px; background:var(--line); overflow:hidden; margin-top:8px; } .bar i { display:block; height:100%; background:var(--green); }
+  .res-h { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:6px 0 14px; }
+  .res-h h2 { margin:0; font-size:20px; }
+  .tablewrap { overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
+  table { border-collapse:collapse; width:100%; font-size:13.5px; }
+  th { background:var(--surface2); color:var(--mute); font-size:12px; text-transform:uppercase; letter-spacing:.04em; text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td { padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; } tr:last-child td { border-bottom:0; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; } td.note { min-width:260px; color:var(--mute); }
+  .pill { display:inline-block; padding:2px 9px; border-radius:99px; font-size:12px; font-weight:600; white-space:nowrap; }
+  .pill.red { background:var(--red-bg); color:var(--red); } .pill.amber { background:var(--amber-bg); color:var(--amber); }
+  .pill.blue { background:var(--blue-bg); color:var(--blue); } .pill.green { background:var(--green-bg); color:var(--green); }
+  .empty { text-align:center; padding:26px 10px; color:var(--mute); }
+  .hide { display:none !important; }
+  .login { max-width:380px; margin:8vh auto 0; }
+  .link { background:none; border:0; color:var(--accent); cursor:pointer; padding:6px 8px; font-weight:600; }
+  @media (max-width:560px) { .card-h, .card-b { padding-left:14px; padding-right:14px; } .kpi b { font-size:24px; } .brand span { display:none; } }
+  @media print { .topbar, .actionbar, #inputs, .noprint { display:none !important; } body { background:#fff; } }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <div class="logo" aria-hidden="true">🧾</div>
+  <div class="brand"><b>Daily Reconciliation</b><span>Sales vs payments, matched automatically</span></div>
+  <div class="spacer"></div>
+  <button class="link hide" id="logout">Log out</button>
+</div></header>
+
+<main>
+  <!-- LOGIN -->
+  <section id="login" class="card login hide">
+    <div class="card-b">
+      <h2 style="margin:0 0 4px">Log in</h2>
+      <p class="hint" style="margin:0 0 14px">This tool handles bank statements, so it is password protected.</p>
+      <label class="lbl" for="pw">Password</label>
+      <input type="password" id="pw" autocomplete="current-password">
+      <div id="loginErr" style="margin-top:12px"></div>
+      <p style="margin:12px 0 0"><button class="btn primary" id="loginBtn" style="width:100%">Log in</button></p>
+    </div>
+  </section>
+
+  <div id="app" class="hide">
+    <div id="inputs">
+      <p class="intro">Upload the day's files and run the check. Every payment from every source is matched against all shops' bills together, so cross-shop payments and extra card machines are handled automatically. Split payments are not flagged.</p>
+
+      <!-- STEP 1 -->
+      <section class="card">
+        <div class="card-h"><div class="stepn">1</div><div><h2>Day &amp; shops</h2><p>Which day are you reconciling?</p></div></div>
+        <div class="card-b"><div class="grid">
+          <div><label class="lbl" for="date">Business date</label><input type="date" id="date"></div>
+          <div><label class="lbl" for="shops">Shop names (comma separated)</label><input type="text" id="shops" value="Smart Mart, Smart Fashions"></div>
+        </div></div>
+      </section>
+
+      <!-- STEP 2 -->
+      <section class="card">
+        <div class="card-h"><div class="stepn">2</div><div><h2>Billing exports</h2><p>One sales Excel file per shop</p></div></div>
+        <div class="card-b"><div class="grid" id="posBox"></div></div>
+      </section>
+
+      <!-- STEP 3 -->
+      <section class="card">
+        <div class="card-h"><div class="stepn">3</div><div><h2>Payment sources</h2><p>Add everything that received money today</p></div></div>
+        <div class="card-b">
+          <div class="section-t"><span>🏦 Bank accounts <span class="hint" style="font-weight:400">Federal Bank statement PDFs</span></span>
+            <span class="stepper" role="group" aria-label="Number of bank accounts"><button type="button" data-step="nb" data-d="-1" aria-label="Fewer">−</button><output id="nbOut">2</output><button type="button" data-step="nb" data-d="1" aria-label="More">+</button></span></div>
+          <div id="banks"></div>
+
+          <div class="section-t"><span>📱 PhonePe / EDC settlement</span></div>
+          <div id="ppBox"></div>
+
+          <div class="section-t"><span>💳 Card machines <span class="hint" style="font-weight:400">just type the amounts from the slip</span></span>
+            <span class="stepper" role="group" aria-label="Number of card machines"><button type="button" data-step="nm" data-d="-1" aria-label="Fewer">−</button><output id="nmOut">1</output><button type="button" data-step="nm" data-d="1" aria-label="More">+</button></span></div>
+          <div id="machines"></div>
+
+          <div class="section-t"><span>↔️ Direct bank transfers <span class="hint" style="font-weight:400">optional</span></span></div>
+          <textarea id="transfers" placeholder="Amount per line, e.g.&#10;1200&#10;Optional note: 1200,Ramesh transfer"></textarea>
+        </div>
+      </section>
+    </div>
+
+    <div id="runErr"></div>
+    <div id="results"></div>
+  </div>
+</main>
+
+<div class="actionbar hide" id="bar"><div class="actionbar-in">
+  <div class="checks" id="checks" aria-live="polite"></div>
+  <button class="btn primary" id="runBtn">Run reconciliation</button>
+</div></div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const inr = (n) => "₹" + Math.round(n).toLocaleString("en-IN");
+const shopList = () => $("#shops").value.split(",").map(s => s.trim()).filter(Boolean);
+const counts = { nb: 2, nm: 1 };
+let lastXlsx = null, lastDate = "";
+$("#date").valueAsDate = new Date();
+
+/* ---------- drop zone ---------- */
+function dropzone({ title, hint, accept, multiple, icon = "📄", cls = "" }) {
+  const d = document.createElement("label");
+  d.className = "drop " + cls;
+  d.innerHTML = `<input type="file" ${accept ? `accept="${accept}"` : ""} ${multiple ? "multiple" : ""}>
+    <span class="ic">${icon}</span><span class="t"><b>${esc(title)}</b><span>${esc(hint)}</span></span>`;
+  const inp = $("input", d), hintEl = $(".t span", d);
+  const refresh = () => {
+    const n = inp.files.length;
+    d.classList.toggle("has", n > 0);
+    hintEl.textContent = n === 0 ? hint : n === 1 ? "✓ " + inp.files[0].name : `✓ ${n} files: ` + [...inp.files].map(f => f.name).join(", ");
+    updateChecks();
+  };
+  inp.addEventListener("change", refresh);
+  ["dragenter", "dragover"].forEach(e => d.addEventListener(e, ev => { ev.preventDefault(); d.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(e => d.addEventListener(e, () => d.classList.remove("over")));
+  d.addEventListener("drop", ev => { ev.preventDefault(); if (ev.dataTransfer.files.length) { inp.files = ev.dataTransfer.files; refresh(); } });
+  d.input = inp;
+  return d;
+}
+
+/* ---------- builders ---------- */
+function drawPos() {
+  const keep = {};
+  $$("#posBox .drop").forEach(d => keep[d.dataset.shop] = d);
+  $("#posBox").innerHTML = "";
+  shopList().forEach(s => {
+    const d = keep[s] || Object.assign(dropzone({ title: s, hint: "Drop sales Excel (.xlsx) or click", accept: ".xlsx", icon: "📊" }), {});
+    d.dataset.shop = s; d.querySelector(".t b").textContent = s;
+    $("#posBox").appendChild(d);
+  });
+  updateChecks();
+}
+/* mirrors the server parser: plain amounts, or "time,amount,ref" lines */
+function parseAmounts(text) {
+  const out = [];
+  text.split(/\r?\n/).forEach(line => {
+    line = line.trim(); if (!line || /^time/i.test(line)) return;
+    if (/^[\d.,\s₹]*(?:rs\.?)?[\d.,\s]*$/i.test(line)) line.replace(/₹|rs\./gi, " ").split(/\s+/).forEach(t => { const v = parseFloat(t.replace(/,/g, "")); if (v > 0) out.push(v); });
+    else { const p = line.split(",").map(x => x.trim()); const v = parseFloat(p[0].includes(":") ? p[1] : p[0]); if (v > 0) out.push(v); }
+  });
+  return out;
+}
+function hintSelect(cls) { return `<select class="${cls}"></select>`; }
+function fillHints() {
+  $$("select.shophint").forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">Not sure</option>` + shopList().map(s => `<option>${esc(s)}</option>`).join("");
+    if (shopList().includes(cur)) sel.value = cur;
+  });
+}
+function resize(boxSel, n, make) {
+  const box = $(boxSel);
+  while (box.children.length > n) box.removeChild(box.lastChild);
+  while (box.children.length < n) box.appendChild(make(box.children.length));
+  fillHints(); updateChecks();
+}
+function makeBank(j) {
+  const d = document.createElement("div"); d.className = "sub-card";
+  d.innerHTML = `<div class="row-h">Account ${j + 1}</div><div class="grid">
+    <div><label class="lbl">Account name</label><input type="text" class="blabel" value="Federal Bank - Account ${j + 1}"></div>
+    <div><label class="lbl">Mainly used by (optional)</label>${hintSelect("bhint shophint")}</div></div>
+    <div style="margin-top:12px" class="slot"></div>`;
+  $(".slot", d).appendChild(dropzone({ title: "Statement PDF(s)", hint: "Drop PDF or click", accept: ".pdf", multiple: true, icon: "🏦", cls: "bpdf" }));
+  return d;
+}
+function makeMachine(j) {
+  const d = document.createElement("div"); d.className = "sub-card";
+  d.innerHTML = `<div class="row-h">Machine ${j + 1}</div><div class="grid">
+    <div><label class="lbl">Machine name</label><input type="text" class="mlabel" value="Card Machine ${j + 1}"></div>
+    <div><label class="lbl">Mainly used by (optional)</label>${hintSelect("mhint shophint")}</div></div>
+    <div style="margin-top:12px"><label class="lbl">Card payments from the slip: just type the amounts</label>
+      <textarea class="mtext" rows="4" inputmode="decimal" placeholder="One amount per line, or separated by spaces:&#10;620&#10;2200&#10;1860"></textarea>
+      <div class="amt-sum hint" aria-live="polite">No amounts yet</div></div>
+    <details style="margin-top:10px"><summary>Optional: add time / reference, or upload a CSV</summary>
+      <p class="hint" style="margin:0 0 8px">Time and reference are never required. If you want to, write a line like <code>17:03,620,097776</code> (time, amount, ref); it can be mixed with plain amounts. Or upload a CSV instead.</p>
+      <div class="slot"></div></details>`;
+  $(".slot", d).appendChild(dropzone({ title: "Slip CSV (optional)", hint: "Columns: time, amount, ref", accept: ".csv", icon: "💳", cls: "mcsv" }));
+  const ta = $(".mtext", d), sum = $(".amt-sum", d);
+  ta.addEventListener("input", () => {
+    const a = parseAmounts(ta.value);
+    sum.textContent = a.length ? `${a.length} payment${a.length === 1 ? "" : "s"} · total ${inr(a.reduce((x, y) => x + y, 0))}  (check against the slip total)` : "No amounts yet";
+  });
+  return d;
+}
+const drawBanks = () => resize("#banks", counts.nb, makeBank);
+const drawMachines = () => resize("#machines", counts.nm, makeMachine);
+$$("[data-step]").forEach(b => b.addEventListener("click", () => {
+  const k = b.dataset.step, max = k === "nb" ? 6 : 8;
+  counts[k] = Math.max(0, Math.min(max, counts[k] + +b.dataset.d));
+  $("#" + k + "Out").textContent = counts[k];
+  k === "nb" ? drawBanks() : drawMachines();
+}));
+$("#ppBox").appendChild(dropzone({ title: "Settlement CSV(s)", hint: "Drop one or more PhonePe / EDC CSVs", accept: ".csv", multiple: true, icon: "📱", cls: "pp" }));
+$("#shops").addEventListener("input", () => { drawPos(); fillHints(); });
+$("#transfers").addEventListener("input", updateChecks);
+$("#date").addEventListener("input", updateChecks);
+
+/* ---------- readiness chips ---------- */
+function updateChecks() {
+  const shops = shopList(), posDone = $$("#posBox .drop.has").length;
+  const pay = $$("#banks .drop.has").length + ($("#ppBox .drop.has") ? 1 : 0) + $$("#machines .sub-card").filter(c => $(".drop.has", c) || $(".mtext", c).value.trim()).length + ($("#transfers").value.trim() ? 1 : 0);
+  const chip = (ok, t) => `<span class="chip ${ok ? "ok" : ""}">${ok ? "✓" : "○"} ${t}</span>`;
+  $("#checks").innerHTML = chip(posDone === shops.length && shops.length > 0, `Billing ${posDone}/${shops.length}`) + chip(pay > 0, `${pay} payment source${pay === 1 ? "" : "s"}`);
+}
+document.addEventListener("input", e => { if (e.target.classList.contains("mtext")) updateChecks(); });
+
+/* ---------- API ---------- */
+async function api(path, opts) {
+  let r;
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 180000);
+  try { r = await fetch(path, { ...opts, signal: ctl.signal }); }
+  catch (e) {
+    return { ok: false, status: 0, data: { error: e.name === "AbortError" ? "Timed out after 3 minutes. Check the terminal window running the app for the step that is slow." : "Cannot reach the app. Is it still running? (Start it again with start_web.bat and reopen http://127.0.0.1:5000)" } };
+  } finally { clearTimeout(timer); }
+  let data = {};
+  try { data = await r.json(); } catch { data = { error: "Server error (" + r.status + ")." }; }
+  return { ok: r.ok, status: r.status, data };
+}
+async function boot() {
+  const { data } = await api("/api/status");
+  if (data.locked) {
+    $("#login").classList.remove("hide");
+    $("#login").innerHTML = `<div class="card-b"><div class="alert err">This hosted copy has no APP_PASSWORD configured, so it is locked. Set APP_PASSWORD in the Vercel project's environment variables and redeploy.</div></div>`;
+  } else if (data.needs_login && !data.authed) {
+    $("#login").classList.remove("hide"); $("#pw").focus();
+  } else showApp(data.needs_login);
+}
+function showApp(canLogout) {
+  $("#login").classList.add("hide"); $("#app").classList.remove("hide"); $("#bar").classList.remove("hide");
+  if (canLogout) $("#logout").classList.remove("hide");
+}
+async function doLogin() {
+  const { ok, data } = await api("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: $("#pw").value }) });
+  if (ok) showApp(true); else $("#loginErr").innerHTML = `<div class="alert err">${esc(data.error)}</div>`;
+}
+$("#loginBtn").addEventListener("click", doLogin);
+$("#pw").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+$("#logout").addEventListener("click", async () => { await api("/api/logout", { method: "POST" }); location.reload(); });
+
+/* ---------- run ---------- */
+$("#runBtn").addEventListener("click", async () => {
+  const btn = $("#runBtn");
+  $("#runErr").innerHTML = ""; $("#results").innerHTML = "";
+  const fd = new FormData(), shops = shopList();
+  fd.append("date", $("#date").value); fd.append("shops", shops.join(","));
+  shops.forEach((s, i) => { const d = $$("#posBox .drop").find(x => x.dataset.shop === s); if (d && d.input.files[0]) fd.append("pos_" + i, d.input.files[0]); });
+  const bs = $$("#banks .sub-card");
+  fd.append("n_banks", bs.length);
+  bs.forEach((b, j) => { fd.append("blabel_" + j, $(".blabel", b).value); fd.append("bhint_" + j, $(".bhint", b).value); [...$(".bpdf input", b).files].forEach(f => fd.append("bank_" + j, f)); });
+  [...$("#ppBox input").files].forEach(f => fd.append("phonepe", f));
+  const ms = $$("#machines .sub-card");
+  fd.append("n_machines", ms.length);
+  ms.forEach((m, j) => { fd.append("mlabel_" + j, $(".mlabel", m).value); fd.append("mhint_" + j, $(".mhint", m).value); fd.append("mtext_" + j, $(".mtext", m).value); const f = $(".mcsv input", m).files[0]; if (f) fd.append("mcsv_" + j, f); });
+  fd.append("transfers", $("#transfers").value);
+  btn.disabled = true; btn.innerHTML = `<span class="spin"></span>Reconciling…`;
+  const t0 = Date.now(), tick = setInterval(() => { btn.innerHTML = `<span class="spin"></span>Reconciling… ${Math.round((Date.now() - t0) / 1000)}s`; }, 1000);
+  const { ok, data } = await api("/api/run", { method: "POST", body: fd });
+  clearInterval(tick); btn.disabled = false; btn.textContent = "Run reconciliation";
+  if (!ok) {
+    if (data.error === "Please log in.") return location.reload();
+    $("#runErr").innerHTML = `<div class="alert err" role="alert">⚠️ ${esc(data.error)}</div>`;
+    $("#runErr").scrollIntoView({ behavior: "smooth", block: "center" }); return;
+  }
+  render(data);
+});
+
+/* ---------- results ---------- */
+const isInfo = (st) => st.startsWith("Matched - ") && !st.includes("Review");
+const pillFor = (st) => st.includes("Unmatched") ? ["red", "Unmatched"] : st.includes("Excess") ? ["amber", "Excess digital"] : st.includes("Cross") ? ["blue", "Cross-shop"] : st.includes("Combined") ? ["blue", "Combined payment"] : st.includes("Split") ? ["blue", "Split payment"] : ["green", st];
+function table(heads, rows, numCols = []) {
+  return `<div class="tablewrap"><table><thead><tr>${heads.map((h, i) => `<th class="${numCols.includes(i) ? "num" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(r => `<tr>${r.map((c, i) => `<td class="${numCols.includes(i) ? "num" : ""}">${c.__html ?? esc(c)}</td>`).join("")}</tr>`).join("") + `</tbody></table></div>`;
+}
+const H = (s) => ({ __html: s });
+function render(s) {
+  lastXlsx = s.xlsx; lastDate = s.date;
+  const shops = Object.keys(s.shops), pct = s.total_net ? Math.min(100, s.total_digital / s.total_net * 100) : 0;
+  const issues = s.issues.filter(i => !isInfo(i.status)), cross = s.issues.filter(i => isInfo(i.status));
+  let h = `<div class="res-h" id="resTop"><h2>Results · ${esc(s.date)}</h2><span class="noprint"><button class="btn sm" onclick="window.print()">🖨 Print</button> <button class="btn primary sm" id="dl">⬇ Download Excel report</button></span></div>
+  <div class="kpis">
+    <div class="kpi"><span>Total net sales</span><b>${inr(s.total_net)}</b><small>${shops.reduce((a, n) => a + s.shops[n].bills, 0)} bills across ${shops.length} shop${shops.length === 1 ? "" : "s"}</small></div>
+    <div class="kpi"><span>Digital confirmed</span><b>${inr(s.total_digital)}</b><small>${pct.toFixed(0)}% of sales matched to a payment</small><div class="bar" aria-hidden="true"><i style="width:${pct}%"></i></div></div>
+    <div class="kpi cash"><span>Implied cash</span><b>${inr(s.implied_cash)}</b><small>Net sales − digital. Not a cash count.</small></div>
+    <div class="kpi"><span>Needs a look</span><b>${issues.length}</b><small>${s.unassigned.length} unassigned payment${s.unassigned.length === 1 ? "" : "s"} · ${cross.length} auto-explained</small></div>
+  </div>`;
+  h += `<section class="card"><div class="card-h"><div><h2>Items needing a look</h2><p>Bills whose digital payment could not be confirmed</p></div></div><div class="card-b">` +
+    (issues.length ? table(["Shop", "Bill", "Time", "Net", "Recorded digital", "Status", "What to check"],
+      issues.map(i => { const [c, t] = pillFor(i.status); return [i.shop, i.bill, i.time, inr(i.net), inr(i.recorded_digital), H(`<span class="pill ${c}">${esc(t)}</span>`), H(`<span class="note" style="color:var(--mute)">${esc(i.note)}</span>`)]; }), [3, 4])
+      : `<div class="alert ok" style="margin:0">✓ No bills need review.</div>`) + `</div></section>`;
+  if (s.unassigned.length) h += `<section class="card"><div class="card-h"><div><h2>${s.unassigned.length} payment${s.unassigned.length === 1 ? "" : "s"} matched no bill · ${inr(s.unassigned.reduce((a, p) => a + p.amount, 0))}</h2><p>Money arrived but fits no bill. Check for a missing bill, duplicate or tip.</p></div></div><div class="card-b">` +
+    table(["Amount", "Source", "Reference", "Time / date"], s.unassigned.map(p => [inr(p.amount), p.source, p.ref, p.time]), [0]) + `</div></section>`;
+  h += `<section class="card"><div class="card-h"><div><h2>By shop</h2></div></div><div class="card-b">` + table(["Shop", "Bills", "Net sales", "Till 'Card' total", "Digital confirmed", "Implied cash"],
+    shops.map(n => { const v = s.shops[n]; return [n, v.bills, inr(v.net), inr(v.recorded_card), inr(v.confirmed_digital), inr(v.implied_cash)]; }), [1, 2, 3, 4, 5]) + `</div></section>`;
+  h += `<section class="card"><div class="card-h"><div><h2>Where each source's money went</h2><p>Amounts under a shop other than the source's usual one are cross-shop routing</p></div></div><div class="card-b">` +
+    table(["Source", "Transactions", "Total", ...shops.map(x => "→ " + x)],
+      Object.entries(s.sources).map(([n, v]) => [n, v.count, inr(v.total), ...shops.map(x => inr(v.per_shop[x] || 0))]), [1, 2, ...shops.map((_, i) => i + 3)]) + `</div></section>`;
+  if (cross.length) h += `<section class="card"><div class="card-h"><div><h2>${cross.length} bill${cross.length === 1 ? "" : "s"} matched in a special way</h2><p>Money confirmed received: paid via another shop's source, together with other bills, or in several parts. Quick glance recommended.</p></div></div><div class="card-b">` +
+    table(["Shop", "Bill", "Time", "Net", "Source", "Status", "Details"], cross.map(i => { const [c, t] = pillFor(i.status); return [i.shop, i.bill, i.time, inr(i.net), i.source, H(`<span class="pill ${c}">${esc(t)}</span>`), H(`<span class="note" style="color:var(--mute)">${esc(i.note)}</span>`)]; }), [3]) + `</div></section>`;
+  $("#results").innerHTML = h;
+  $("#dl").addEventListener("click", () => {
+    const bin = atob(lastXlsx), buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    a.download = `Reconciliation_${lastDate}.xlsx`; a.click();
+  });
+  $("#resTop").scrollIntoView({ behavior: "smooth" });
+}
+drawPos(); drawBanks(); drawMachines(); boot();
+</script>
+</body>
+</html>

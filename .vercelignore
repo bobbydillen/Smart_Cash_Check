@@ -1,0 +1,7 @@
+streamlit_app.py
+requirements-streamlit.txt
+Dockerfile
+start_app.*
+__pycache__
+*.xlsx
+*.pdf
