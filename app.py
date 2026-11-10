@@ -156,12 +156,13 @@ def run():
             if not (banks or pps or cms or trs):
                 return jsonify(error="Add at least one payment source."), 400
             out = os.path.join(tmp, "report.xlsx")
-            s = run_reconciliation(date_label, pos, banks, pps, cms, trs, out, log=lambda x: print('[reconcile]', x, flush=True))
+            s = run_reconciliation(date_label, pos, banks, pps, cms, trs, out, log=lambda x: print('[reconcile]', x, flush=True),
+                                combos=form.get('combos', '1') == '1')
             with open(out, "rb") as fh:
                 xlsx = base64.b64encode(fh.read()).decode()
     except Exception as e:
         return jsonify(error=f"Could not complete the reconciliation: {e}"), 400
-    s["unassigned"] = [dict(amount=p.amount, source=p.source, ref=p.ref, time=p.time_str) for p in s["unassigned"]]
+    s["unassigned"] = [dict(amount=p.amount, source=p.source, ref=p.ref, time=p.time_str, suspects=p.suspects or []) for p in s["unassigned"]]
     s["xlsx"] = xlsx
     return jsonify(s)
 

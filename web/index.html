@@ -154,6 +154,8 @@
             <span class="stepper" role="group" aria-label="Number of card machines"><button type="button" data-step="nm" data-d="-1" aria-label="Fewer">−</button><output id="nmOut">1</output><button type="button" data-step="nm" data-d="1" aria-label="More">+</button></span></div>
           <div id="machines"></div>
 
+          <label class="hint" style="display:flex;gap:8px;align-items:flex-start;margin:16px 0 0"><input type="checkbox" id="combos" checked style="margin-top:3px">
+            <span><b style="color:var(--ink)">Also detect combined / split payments</b> (one payment for several bills, or one bill paid in parts). Untick to match only one payment to one bill. Payments under ₹20 are never merged.</span></label>
           <div class="section-t"><span>↔️ Direct bank transfers <span class="hint" style="font-weight:400">optional</span></span></div>
           <textarea id="transfers" placeholder="Amount per line, e.g.&#10;1200&#10;Optional note: 1200,Ramesh transfer"></textarea>
         </div>
@@ -335,6 +337,7 @@ $("#runBtn").addEventListener("click", async () => {
   fd.append("n_machines", ms.length);
   ms.forEach((m, j) => { fd.append("mlabel_" + j, $(".mlabel", m).value); fd.append("mhint_" + j, $(".mhint", m).value); fd.append("mtext_" + j, $(".mtext", m).value); const f = $(".mcsv input", m).files[0]; if (f) fd.append("mcsv_" + j, f); });
   fd.append("transfers", $("#transfers").value);
+  fd.append("combos", $("#combos").checked ? "1" : "0");
   btn.disabled = true; btn.innerHTML = `<span class="spin"></span>Reconciling…`;
   const t0 = Date.now(), tick = setInterval(() => { btn.innerHTML = `<span class="spin"></span>Reconciling… ${Math.round((Date.now() - t0) / 1000)}s`; }, 1000);
   const { ok, data } = await api("/api/run", { method: "POST", body: fd });
@@ -349,7 +352,7 @@ $("#runBtn").addEventListener("click", async () => {
 
 /* ---------- results ---------- */
 const isInfo = (st) => st.startsWith("Matched - ") && !st.includes("Review");
-const pillFor = (st) => st.includes("Unmatched") ? ["red", "Unmatched"] : st.includes("Excess") ? ["amber", "Excess digital"] : st.includes("Cross") ? ["blue", "Cross-shop"] : st.includes("Combined") ? ["blue", "Combined payment"] : st.includes("Split") ? ["blue", "Split payment"] : ["green", st];
+const pillFor = (st) => st.includes("Unmatched") ? ["red", "Unmatched"] : st.includes("Excess") ? ["amber", "Excess digital"] : st.includes("Cross") ? ["blue", "Cross-shop"] : st.includes("Amount Differs") ? ["amber", "Amount differs"] : st.includes("Time Gap") ? ["amber", "Time gap"] : st.includes("Combined") ? ["blue", "Combined payment"] : st.includes("Split") ? ["blue", "Split payment"] : ["green", st];
 function table(heads, rows, numCols = []) {
   return `<div class="tablewrap"><table><thead><tr>${heads.map((h, i) => `<th class="${numCols.includes(i) ? "num" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(r => `<tr>${r.map((c, i) => `<td class="${numCols.includes(i) ? "num" : ""}">${c.__html ?? esc(c)}</td>`).join("")}</tr>`).join("") + `</tbody></table></div>`;
@@ -366,12 +369,22 @@ function render(s) {
     <div class="kpi cash"><span>Implied cash</span><b>${inr(s.implied_cash)}</b><small>Net sales − digital. Not a cash count.</small></div>
     <div class="kpi"><span>Needs a look</span><b>${issues.length}</b><small>${s.unassigned.length} unassigned payment${s.unassigned.length === 1 ? "" : "s"} · ${cross.length} auto-explained</small></div>
   </div>`;
+  const pf = s.proof, ok = Math.abs(pf.unexplained) < 0.005, row = (a, b, cls = "") => `<tr${cls ? ` style="font-weight:700"` : ""}><td>${a}</td><td class="num">${b}</td></tr>`;
+  h += `<section class="card"><div class="card-h"><div><h2>Proof: card sales − money received</h2><p>Every shop's card/digital sales minus Federal Bank, PhonePe, card machines and transfers. The gap must be fully explained.</p></div></div><div class="card-b"><div class="tablewrap"><table><tbody>` +
+    Object.entries(pf.card_by_shop).map(([n, v]) => row("Card sales · " + esc(n), inr(v))).join("") + row("A. Total card sales", inr(pf.total_card), 1) +
+    Object.entries(pf.received_by_source).map(([n, v]) => row("Received · " + esc(n), inr(v))).join("") + row("B. Total money received", inr(pf.total_received), 1) +
+    row("Difference (A − B)", inr(pf.difference), 1) +
+    row("&nbsp;&nbsp;+ Bills marked card but no payment", inr(pf.unmatched_bills)) + row("&nbsp;&nbsp;− Payments that match no bill", inr(-pf.unassigned_payments)) + row("&nbsp;&nbsp;− Amount differences on matched bills", inr(-pf.amount_differences)) +
+    `</tbody></table></div><div class="alert ${ok ? "ok" : "err"}" style="margin:12px 0 0">${ok ? "✓ Fully explained: nothing is left unexplained. Review the items below to decide what each one is." : "⚠ ₹" + Math.abs(pf.unexplained).toLocaleString("en-IN") + " is unexplained, so something is wrong with the inputs (missing/duplicated file?)."}</div></div></section>`;
   h += `<section class="card"><div class="card-h"><div><h2>Items needing a look</h2><p>Bills whose digital payment could not be confirmed</p></div></div><div class="card-b">` +
     (issues.length ? table(["Shop", "Bill", "Time", "Net", "Recorded digital", "Status", "What to check"],
       issues.map(i => { const [c, t] = pillFor(i.status); return [i.shop, i.bill, i.time, inr(i.net), inr(i.recorded_digital), H(`<span class="pill ${c}">${esc(t)}</span>`), H(`<span class="note" style="color:var(--mute)">${esc(i.note)}</span>`)]; }), [3, 4])
       : `<div class="alert ok" style="margin:0">✓ No bills need review.</div>`) + `</div></section>`;
   if (s.unassigned.length) h += `<section class="card"><div class="card-h"><div><h2>${s.unassigned.length} payment${s.unassigned.length === 1 ? "" : "s"} matched no bill · ${inr(s.unassigned.reduce((a, p) => a + p.amount, 0))}</h2><p>Money arrived but fits no bill. Check for a missing bill, duplicate or tip.</p></div></div><div class="card-b">` +
-    table(["Amount", "Source", "Reference", "Time / date"], s.unassigned.map(p => [inr(p.amount), p.source, p.ref, p.time]), [0]) + `</div></section>`;
+    table(["Amount", "Source", "Reference", "Time / date", "Likely explanation"], s.unassigned.map(p => [inr(p.amount), p.source, p.ref, p.time, H(p.suspects.length ? p.suspects.map(x => `<div style="white-space:normal;min-width:300px;margin:2px 0">Bill <b>${esc(x.bill)}</b> (${esc(x.shop)}, ${esc(x.time)}, ${inr(x.net)}) was marked as <b>cash</b>, but this was paid through <b>${esc(p.source)}</b>${x.gap_min != null ? " (" + x.gap_min + " min from the bill)" : ""}.</div>`).join("") + (p.suspects[0].total > p.suspects.length ? `<div class="hint">…and ${p.suspects[0].total - p.suspects.length} more cash bills with this exact amount</div>` : (p.suspects.length > 1 ? `<div class="hint">Only one of these can be the right bill.</div>` : "")) : `<span class="hint">No cash bill with this amount: a test payment, or a bill that is missing.</span>`)]), [0]) + `</div></section>`;
+  if (s.splits.length) { const cashT = s.splits.reduce((a, x) => a + x.cash, 0), digT = s.splits.reduce((a, x) => a + x.digital, 0);
+    h += `<section class="card"><div class="card-h"><div><h2>${s.splits.length} bills paid part cash, part digital</h2><p>Digital part ${inr(digT)} is checked against payments; cash part ${inr(cashT)} (Net − Card) is accepted as cash received.</p></div></div><div class="card-b">` +
+      table(["Shop", "Bill", "Time", "Net", "Paid digitally", "Cash part", "Digital via"], s.splits.map(x => [x.shop, x.bill, x.time, inr(x.net), inr(x.digital), inr(x.cash), x.source]), [3, 4, 5]) + `</div></section>`; }
   h += `<section class="card"><div class="card-h"><div><h2>By shop</h2></div></div><div class="card-b">` + table(["Shop", "Bills", "Net sales", "Till 'Card' total", "Digital confirmed", "Implied cash"],
     shops.map(n => { const v = s.shops[n]; return [n, v.bills, inr(v.net), inr(v.recorded_card), inr(v.confirmed_digital), inr(v.implied_cash)]; }), [1, 2, 3, 4, 5]) + `</div></section>`;
   h += `<section class="card"><div class="card-h"><div><h2>Where each source's money went</h2><p>Amounts under a shop other than the source's usual one are cross-shop routing</p></div></div><div class="card-b">` +

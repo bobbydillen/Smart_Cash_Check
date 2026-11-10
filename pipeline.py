@@ -5,8 +5,8 @@ from datetime import datetime
 
 from reconcile_lib import (load_pos_bills, load_federal_bank_pdf, load_phonepe_csv,
                            load_card_machine_csv, load_manual_transfers_csv,
-                           reconcile_all_shops, ANOMALY_TOLERANCE, portions)
-from report import build_workbook, classify, source_shop_majority
+                           reconcile_all_shops, ANOMALY_TOLERANCE, portions, find_cash_suspects)
+from report import build_workbook, classify, source_shop_majority, compute_proof, split_bills
 
 
 def _unique(label, taken):
@@ -17,7 +17,7 @@ def _unique(label, taken):
 
 
 def run_reconciliation(date_label, pos_files, bank_pdfs=(), phonepe_files=(), card_machines=(),
-                       transfer_files=(), out_path="reconciliation.xlsx", log=print):
+                       transfer_files=(), out_path="reconciliation.xlsx", log=print, combos=True):
     """
     pos_files:     {"Smart Mart": path.xlsx, "Smart Fashions": path.xlsx}
     bank_pdfs:     [(label, path.pdf[, shop_hint]), ...]   <- one per bank account
@@ -59,8 +59,9 @@ def run_reconciliation(date_label, pos_files, bank_pdfs=(), phonepe_files=(), ca
         raise ValueError("Upload at least one payment source (bank PDF, PhonePe CSV, card machine...).")
 
     pool = [p for recs in sources.values() for p in recs]
-    results_by_shop, unused = reconcile_all_shops(bills_by_shop, pool)
+    results_by_shop, unused = reconcile_all_shops(bills_by_shop, pool, combos)
     shops = list(bills_by_shop)
+    find_cash_suspects(unused, results_by_shop)
     build_workbook(date_label, shops, results_by_shop, unused, sources, out_path)
 
     majority = source_shop_majority(results_by_shop)
@@ -81,6 +82,8 @@ def run_reconciliation(date_label, pos_files, bank_pdfs=(), phonepe_files=(), ca
     for n, recs in sources.items():
         per = {s: sum(a for m in results_by_shop[s] for src, a in portions(m) if src == n) for s in shops}
         summary["sources"][n] = dict(count=len(recs), total=sum(p.amount for p in recs), per_shop=per)
+    summary["splits"] = split_bills(results_by_shop)
+    summary["proof"] = compute_proof(results_by_shop, unused, sources)
     summary["total_net"] = sum(v["net"] for v in summary["shops"].values())
     summary["total_digital"] = sum(v["confirmed_digital"] for v in summary["shops"].values())
     summary["implied_cash"] = summary["total_net"] - summary["total_digital"]
