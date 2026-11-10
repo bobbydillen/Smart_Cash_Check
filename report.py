@@ -8,6 +8,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 TIME_GAP_REVIEW_MIN = 90
+ROUNDING_MAX = 10
 from reconcile_lib import ANOMALY_TOLERANCE, SPLIT_SEP, portions
 
 A = "Arial"
@@ -100,6 +101,7 @@ def split_bills(results_by_shop):
             if b.card > 0 and b.net - b.card > 0.01:
                 out.append(dict(shop=shop, bill=b.billno, time=_hhmm(b.time), net=b.net, digital=b.card,
                                 cash=round(b.net - b.card, 2),
+                                note="Rounding (cash part is Rs.10 or less)" if b.net - b.card <= ROUNDING_MAX else "",
                                 source=(m.payment.source if m.payment else "- not matched -")))
     out.sort(key=lambda x: -x["cash"])
     return out
@@ -112,11 +114,11 @@ def _split_sheet(wb, rows):
     ws["A2"] = ("Only the digital part is verified against payments received. The cash part (Net - Card) is accepted at face value; "
                 "there is no cash count in the data.")
     ws["A2"].font = ITAL
-    _header(ws, 4, ["Shop", "Bill No", "Bill Time", "Net Bill", "Paid Digitally", "Cash Part (Net - Card)", "Digital Received Via"])
+    _header(ws, 4, ["Shop", "Bill No", "Bill Time", "Net Bill", "Paid Digitally", "Cash Part (Net - Card)", "Digital Received Via", "Note"])
     for x in rows:
-        ws.append([x["shop"], x["bill"], x["time"], x["net"], x["digital"], x["cash"], x["source"]])
+        ws.append([x["shop"], x["bill"], x["time"], x["net"], x["digital"], x["cash"], x["source"], x["note"]])
         rr = ws.max_row
-        for c in range(1, 8):
+        for c in range(1, 9):
             ws.cell(row=rr, column=c).border, ws.cell(row=rr, column=c).font = BORDER, NORM
         for c in (4, 5, 6):
             ws.cell(row=rr, column=c).number_format = MONEY
@@ -126,7 +128,7 @@ def _split_sheet(wb, rows):
     for c, L in ((4, "D"), (5, "E"), (6, "F")):
         cell = ws.cell(row=tot, column=c, value=f"=SUM({L}5:{L}{max(last, 5)})" if rows else 0)
         cell.font, cell.number_format = BOLD, MONEY
-    _widths(ws, [16, 12, 10, 14, 14, 20, 34])
+    _widths(ws, [16, 12, 10, 14, 14, 20, 34, 36])
     ws.freeze_panes = "A5"
 
 
